@@ -2,7 +2,7 @@ import argparse
 import logging
 from logging.handlers import RotatingFileHandler
 
-from constants import BASE_DIR
+from constants import BASE_DIR, LOG_DIR, LOG_FILE
 
 LOG_FORMAT = '"%(asctime)s - [%(levelname)s] - %(message)s"'
 DT_FORMAT = '%d.%m.%Y %H:%M:%S'
@@ -32,10 +32,10 @@ def configure_argument_parser(available_modes):
 
 
 def configure_logging():
-    """Функция отвечтае за логирование в проекте"""
-    log_dir = BASE_DIR / 'logs'
+    """Функция отвечает за логирование в проекте"""
+    log_dir = BASE_DIR / LOG_DIR
     log_dir.mkdir(exist_ok=True)
-    log_file = log_dir/'parser.log'
+    log_file = log_dir/LOG_FILE
     # Инициализация хендлера с ротацией логов.
     # Максимальный объём одного файла — десять в шестой степени байт (10**6),
     # максимальное количество файлов с логами — 5.

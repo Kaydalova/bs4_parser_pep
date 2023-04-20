@@ -1,5 +1,6 @@
 import logging
 import re
+from exceptions import ParserFindTextException
 from urllib.parse import urljoin
 
 import requests_cache
@@ -7,33 +8,27 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 from tqdm import tqdm
 
 from configs import configure_argument_parser, configure_logging
-from constants import BASE_DIR, EXPECTED_STATUS, MAIN_DOC_URL, PEP_DOCS_URL
+from constants import (BASE_DIR, EXPECTED_STATUS, MAIN_DOC_URL, PEP_DOCS_URL,
+                       STATUS_COUNT_DICT)
 from outputs import control_output
-from utils import find_tag, get_response
+from utils import cook_soup, find_tag, get_response
 
 
 def whats_new(session):
     whats_new_url = urljoin(MAIN_DOC_URL, 'whatsnew/')
-    response = get_response(session, whats_new_url)
-    if response is None:
-        return
+    soup = cook_soup(session, whats_new_url)
+    sections_by_python = find_tag(
+        find_tag(soup, 'section', attrs={'id': 'what-s-new-in-python'}),
+        'div', attrs={'class': 'toctree-wrapper'}).find_all(
+            'li', attrs={'class': 'toctree-l1'})
 
-    soup = BeautifulSoup(response.text, features='lxml')
-    main_div = find_tag(soup, 'section', attrs={'id': 'what-s-new-in-python'})
-    div_with_ul = find_tag(main_div, 'div', attrs={'class': 'toctree-wrapper'})
-    sections_by_python = div_with_ul.find_all(
-        'li', attrs={'class': 'toctree-l1'})
     results = [('Ссылка на статью', 'Заголовок', 'Редактор, Автор')]
 
     for section in tqdm(sections_by_python):
         version_a_tag = find_tag(section, 'a')
         href = version_a_tag['href']
         version_link = urljoin(whats_new_url, href)
-        response = get_response(session, version_link)
-        if response is None:
-            continue
-
-        soup = BeautifulSoup(response.text, features='lxml')
+        soup = cook_soup(session, version_link)
         h1 = find_tag(soup, 'h1')
         dl = find_tag(soup, 'dl')
         dl_text = dl.text.replace('\n', ' ')
@@ -42,11 +37,7 @@ def whats_new(session):
 
 
 def latest_versions(session):
-    response = get_response(session, MAIN_DOC_URL)
-    if response is None:
-        return
-
-    soup = BeautifulSoup(response.text, 'lxml')
+    soup = cook_soup(session, MAIN_DOC_URL)
     sidebar = find_tag(soup, 'div', attrs={'class': 'sphinxsidebarwrapper'})
     ul_tags = sidebar.find_all('ul')
 
@@ -55,7 +46,8 @@ def latest_versions(session):
             a_tags = ul.find_all('a')
             break
         else:
-            raise Exception('Ничего не нашлось')
+            raise ParserFindTextException(
+                f'В тексте тега {ul} нет All versions')
 
     results = [('Ссылка на документацию', 'Версия', 'Статус')]
     pattern = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
@@ -74,11 +66,7 @@ def latest_versions(session):
 
 def download(session):
     downloads_url = urljoin(MAIN_DOC_URL, 'download.html')
-    response = get_response(session, downloads_url)
-    if response is None:
-        return
-
-    soup = BeautifulSoup(response.text, 'lxml')
+    soup = cook_soup(session, downloads_url)
     table_tag = find_tag(soup, 'table', attrs={'class': 'docutils'})
     pdf_a4_tag = find_tag(
         table_tag, 'a', {'href': re.compile(r'.+pdf-a4\.zip$')})
@@ -97,16 +85,8 @@ def download(session):
 
 
 def pep(session):
-    status_list = list(set([n for i in EXPECTED_STATUS.values() for n in i]))
-    status_count_dict = {
-        'A': 0,
-        'D': 0,
-        'F': 0,
-        'P': 0,
-        'R': 0,
-        'S': 0,
-        'W': 0,
-        '': 0}
+    status_list = list(set([
+        status for st_set in EXPECTED_STATUS.values() for status in st_set]))
     response = get_response(session, PEP_DOCS_URL)
     if response is None:
         return
@@ -123,11 +103,7 @@ def pep(session):
         relative_link = find_tag(
             tr, 'a', attrs={'class': 'pep reference internal'})
         link = urljoin(PEP_DOCS_URL, relative_link['href'])
-        response = get_response(session, link)
-        if response is None:
-            return
-
-        soup = BeautifulSoup(response.text, 'lxml')
+        soup = cook_soup(session, link)
         article = find_tag(soup, 'article')
         dl = find_tag(article, 'dl')
         status_on_page = dl.find(string=status_list)
@@ -147,13 +123,13 @@ def pep(session):
                 Ожидаемые статусы: {EXPECTED_STATUS[status_in_table.text[1:]]}
                 ''')
         elif status_on_page == 'Draft':
-            status_count_dict[''] += 1
+            STATUS_COUNT_DICT[''] += 1
         else:
-            status_count_dict[status_on_page[:1]] += 1
+            STATUS_COUNT_DICT[status_on_page[:1]] += 1
 
-    total = sum(status_count_dict.values())
-    status_count_dict['Total'] = total
-    results = list(status_count_dict.items())
+    total = sum(STATUS_COUNT_DICT.values())
+    STATUS_COUNT_DICT['Total'] = total
+    results = list(STATUS_COUNT_DICT.items())
 
     return results
 
