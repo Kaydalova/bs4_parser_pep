@@ -17,9 +17,9 @@ from utils import cook_soup, find_tag, get_response
 def whats_new(session):
     whats_new_url = urljoin(MAIN_DOC_URL, 'whatsnew/')
     soup = cook_soup(session, whats_new_url)
-    sections_by_python = find_tag(
-        soup, 'div', attrs={'class': 'toctree-wrapper'
-                }).find_all('li', attrs={'class': 'toctree-l1'})
+    sections_by_python = find_tag(soup, 'div', attrs={
+        'class': 'toctree-wrapper'}).find_all(
+            'li', attrs={'class': 'toctree-l1'})
 
     results = [('Ссылка на статью', 'Заголовок', 'Редактор, Автор')]
 
