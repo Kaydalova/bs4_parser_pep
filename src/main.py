@@ -18,9 +18,8 @@ def whats_new(session):
     whats_new_url = urljoin(MAIN_DOC_URL, 'whatsnew/')
     soup = cook_soup(session, whats_new_url)
     sections_by_python = find_tag(
-        find_tag(soup, 'section', attrs={'id': 'what-s-new-in-python'}),
-        'div', attrs={'class': 'toctree-wrapper'}).find_all(
-            'li', attrs={'class': 'toctree-l1'})
+        soup, 'div', attrs={'class': 'toctree-wrapper'
+                }).find_all('li', attrs={'class': 'toctree-l1'})
 
     results = [('Ссылка на статью', 'Заголовок', 'Редактор, Автор')]
 
@@ -122,10 +121,10 @@ def pep(session):
                 Статус в карточке: {status_on_page}
                 Ожидаемые статусы: {EXPECTED_STATUS[status_in_table.text[1:]]}
                 ''')
-        elif status_on_page == 'Draft':
-            STATUS_COUNT_DICT[''] += 1
+        elif status_on_page == 'Accepted':
+            STATUS_COUNT_DICT['Active'] += 1
         else:
-            STATUS_COUNT_DICT[status_on_page[:1]] += 1
+            STATUS_COUNT_DICT[status_on_page] += 1
 
     total = sum(STATUS_COUNT_DICT.values())
     STATUS_COUNT_DICT['Total'] = total
